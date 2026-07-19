@@ -54,6 +54,31 @@ src/               the client — dumb components, typed SDK
 
 Config/data files live next to the app (`.novakai-docs-roots.json`, `.novakai-docs-store.json`).
 
+## Desktop (Electron)
+
+The same app runs as a desktop shell — same renderer, same middleware, no IPC rewrite.
+
+```bash
+npm run desktop        # build web + main process, launch Electron (serves dist/)
+npm run desktop:dev    # vite dev server + Electron loading the dev URL (HMR in the shell);
+                       # falls back to the dist server when the dev URL doesn't answer
+npm run build:electron # bundle just the main process (esbuild → dist-electron/main.cjs)
+npm run dist:mac       # package a mac .app/.dmg (electron-builder, appId com.novakai.hq)
+```
+
+How it works: `electron/main.ts` (bundled to `dist-electron/main.cjs`, which `package.json`'s
+`"main"` points at) starts a node http server on `127.0.0.1` with an **ephemeral port** that
+mounts the exact same API middleware as the Vite plugin and statically serves `dist/`. One
+`BrowserWindow` loads that loopback URL — one origin, no CORS, no `file://` quirks. Window
+bounds persist to `userData/window-bounds.json`; a single-instance lock focuses the existing
+window on relaunch; macOS keeps the app alive when the window closes. The main process is
+typechecked via `tsconfig.electron.json` (part of `npm run typecheck`).
+
+**Data dir note:** the middleware anchors `data/` (and the roots/store config files) at the
+app dir — the repo root under `npm run desktop`, identical to `npm run dev`. The packaged-app
+data location (repo checkout vs `userData`) is an open question — see the comment in
+`electron/main.ts`.
+
 ## Standards (as in Novakai-Analytics `STANDARDS.md`)
 
 - 10 principles: pure cores (`dedup`, `tree`, `paths`, `store` ops) with fs/HTTP at the edges only; DRY contract in `shared/`; middleware composable into any connect server.

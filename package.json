@@ -3,13 +3,18 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "main": "dist-electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:electron": "esbuild electron/main.ts --bundle --platform=node --format=cjs --external:electron --outfile=dist-electron/main.cjs",
+    "desktop": "npm run build && npm run build:electron && electron .",
+    "desktop:dev": "node electron/dev.mjs",
+    "dist:mac": "npm run build && npm run build:electron && electron-builder --mac --config electron-builder.yml",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b && tsc -p tsconfig.electron.json"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -71,6 +76,8 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
     "autoprefixer": "^10.4.23",
+    "electron": "^43.1.1",
+    "electron-builder": "^26.15.3",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",

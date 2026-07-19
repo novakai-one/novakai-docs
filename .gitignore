@@ -1,0 +1,35 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# --- Novakai HQ ---
+# Personal notes — Chris writes private stuff here, never committed
+private/*
+!private/README.md
+# Local machine config (absolute paths, per-machine state)
+.novakai-docs-roots.json
+.novakai-docs-store.json
+.md-viewer-roots.json
+# Per-root task lists may contain personal items
+tasks.json

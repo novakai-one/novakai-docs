@@ -9,6 +9,7 @@ import {
   groupByDay,
   kindHue,
   matchesFilter,
+  storeSourceSubtitle,
   timeLabel,
 } from './hqView'
 
@@ -119,5 +120,23 @@ describe('matchesFilter', () => {
     expect(matchesFilter(b, 'sessionid')).toBe(true)
     expect(matchesFilter(b, 'night shift')).toBe(true)
     expect(matchesFilter(b, 'zzz')).toBe(false)
+  })
+})
+
+describe('storeSourceSubtitle', () => {
+  it('uses the resolved dir for both source modes, normalizing a trailing slash', () => {
+    expect(storeSourceSubtitle('decisions.jsonl', '/a/b/.novakai/stores', 'ready')).toBe(
+      '/a/b/.novakai/stores/decisions.jsonl',
+    )
+    // internal dir is still the truthful path — not replaced with a relative label
+    expect(storeSourceSubtitle('tasks.jsonl', '/app/data/', 'ready')).toBe('/app/data/tasks.jsonl')
+    expect(storeSourceSubtitle('okrs.jsonl', '/x///', 'ready')).toBe('/x/okrs.jsonl')
+  })
+
+  it('never asserts data/ before the source is established', () => {
+    expect(storeSourceSubtitle('decisions.jsonl', null, 'loading')).toBe('Resolving source…')
+    expect(storeSourceSubtitle('decisions.jsonl', null, 'error')).toBe('Source unavailable')
+    // dir wins even if state is stale
+    expect(storeSourceSubtitle('decisions.jsonl', '/d', 'error')).toBe('/d/decisions.jsonl')
   })
 })

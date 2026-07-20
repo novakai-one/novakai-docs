@@ -8,7 +8,10 @@ import { useMemo } from 'react'
 import { AlertTriangle, Loader2 } from 'lucide-react'
 import type { HQBlock, Ref } from '../../../shared/hq'
 import { kindHue } from '../../lib/hqView'
+import { cn } from '@/lib/utils'
 import { useHQStore } from '../../hooks/useHQStore'
+import { NOOP, useReadOnlyInspector } from '../../hooks/useReadOnlyInspector'
+import { HQInspector } from './HQInspector'
 import { HQNotices } from './HQNotices'
 
 const isRef = (x: unknown): x is Ref =>
@@ -26,13 +29,15 @@ export function HQLearnings() {
     [blocks],
   )
 
+  const inspector = useReadOnlyInspector(blocks)
   const loading = hq.data === null && hq.loadError === null
 
   return (
     <div
-      className="flex h-full flex-col bg-[#0b0b0d] text-[#d7d3cc]"
+      className="flex h-full bg-[#0b0b0d] text-[#d7d3cc]"
       style={{ fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }}
     >
+      <div className="flex min-w-0 flex-1 flex-col">
       <HQNotices
         storeFile="learnings.jsonl"
         loadError={hq.loadError}
@@ -54,8 +59,17 @@ export function HQLearnings() {
               {sorted.map((b) => {
                 const evidence = evidenceOf(b)
                 const body = str(b.body) ?? b.title
+                const selected = inspector.selectedId === b.id
                 return (
-                  <article key={b.id} className="rounded-lg border border-[#2a2a2e] bg-[#121214] p-4">
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => inspector.select(b.id)}
+                    className={cn(
+                      'w-full rounded-lg border bg-[#121214] p-4 text-left transition-colors duration-150 hover:bg-[#171719]',
+                      selected ? 'border-[#d7a842]/50 bg-[#232225]' : 'border-[#2a2a2e]',
+                    )}
+                  >
                     <p className="whitespace-pre-wrap text-sm leading-6 text-[#f1efec]">{body}</p>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <span className="text-[9px] font-medium uppercase tracking-[0.12em] text-[#67656d]">
@@ -80,13 +94,30 @@ export function HQLearnings() {
                         </span>
                       )}
                     </div>
-                  </article>
+                  </button>
                 )
               })}
             </div>
           )}
         </div>
       </div>
+      </div>
+
+      {inspector.block && (
+        <HQInspector
+          block={inspector.block}
+          open={inspector.open}
+          width={inspector.width}
+          pending={false}
+          statuses={[]}
+          refKinds={[]}
+          readOnly
+          onResize={inspector.resize}
+          onClose={inspector.close}
+          onPatch={NOOP}
+          onDelete={NOOP}
+        />
+      )}
     </div>
   )
 }

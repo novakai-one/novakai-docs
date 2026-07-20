@@ -8,7 +8,10 @@
 import { useMemo } from 'react'
 import { Loader2 } from 'lucide-react'
 import type { HQBlock, HQStoreName } from '../../../shared/hq'
+import { cn } from '@/lib/utils'
 import { useHQStore } from '../../hooks/useHQStore'
+import { NOOP, useReadOnlyInspector } from '../../hooks/useReadOnlyInspector'
+import { HQInspector } from './HQInspector'
 import { HQNotices } from './HQNotices'
 import { RefChips } from './RefChips'
 
@@ -34,13 +37,20 @@ export interface HQRecordListProps {
   emptyLabel?: string
 }
 
-function Card({ b }: { b: HQBlock }) {
+function Card({ b, selected, onClick }: { b: HQBlock; selected: boolean; onClick: () => void }) {
   const body = str(b.body)
   const owner = str(b.owner)
   const priority = str(b.priority)
   const when = stamp(tsOf(b))
   return (
-    <article className="rounded-lg border border-[#2a2a2e] bg-[#121214] p-4">
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'w-full rounded-lg border bg-[#121214] p-4 text-left transition-colors duration-150 hover:border-[#3a3a3f] hover:bg-[#171719]',
+        selected ? 'border-[#d7a842]/50 bg-[#232225]' : 'border-[#2a2a2e]',
+      )}
+    >
       <div className="flex items-start gap-2">
         <p className="min-w-0 flex-1 text-sm font-medium leading-5 text-[#f1efec]">{b.title}</p>
         {b.status !== undefined && (
@@ -63,7 +73,7 @@ function Card({ b }: { b: HQBlock }) {
           <RefChips refs={b.refs} />
         </div>
       )}
-    </article>
+    </button>
   )
 }
 
@@ -88,13 +98,15 @@ export function HQRecordList({ store, storeFile, groupByStatus, emptyLabel }: HQ
     return [...byStatus.entries()]
   }, [sorted, groupByStatus])
 
+  const inspector = useReadOnlyInspector(blocks)
   const loading = hq.data === null && hq.loadError === null
 
   return (
     <div
-      className="flex h-full flex-col bg-[#0b0b0d] text-[#d7d3cc]"
+      className="flex h-full bg-[#0b0b0d] text-[#d7d3cc]"
       style={{ fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }}
     >
+      <div className="flex min-w-0 flex-1 flex-col">
       <HQNotices
         storeFile={storeFile}
         loadError={hq.loadError}
@@ -122,7 +134,12 @@ export function HQRecordList({ store, storeFile, groupByStatus, emptyLabel }: HQ
                 </h2>
                 <div className="space-y-2.5">
                   {items.map((b) => (
-                    <Card key={b.id} b={b} />
+                    <Card
+                      key={b.id}
+                      b={b}
+                      selected={inspector.selectedId === b.id}
+                      onClick={() => inspector.select(b.id)}
+                    />
                   ))}
                 </div>
               </section>
@@ -130,12 +147,34 @@ export function HQRecordList({ store, storeFile, groupByStatus, emptyLabel }: HQ
           ) : (
             <div className="space-y-2.5">
               {sorted.map((b) => (
-                <Card key={b.id} b={b} />
+                <Card
+                  key={b.id}
+                  b={b}
+                  selected={inspector.selectedId === b.id}
+                  onClick={() => inspector.select(b.id)}
+                />
               ))}
             </div>
           )}
         </div>
       </div>
+      </div>
+
+      {inspector.block && (
+        <HQInspector
+          block={inspector.block}
+          open={inspector.open}
+          width={inspector.width}
+          pending={false}
+          statuses={[]}
+          refKinds={[]}
+          readOnly
+          onResize={inspector.resize}
+          onClose={inspector.close}
+          onPatch={NOOP}
+          onDelete={NOOP}
+        />
+      )}
     </div>
   )
 }

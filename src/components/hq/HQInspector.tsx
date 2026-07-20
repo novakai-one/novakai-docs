@@ -9,10 +9,13 @@
  */
 import { useRef, useState } from 'react'
 import { Loader2, Plus, Trash2, X } from 'lucide-react'
-import type { HQBlock } from '../../../shared/hq'
+import type { HQBlock, Ref } from '../../../shared/hq'
 import { addRef, removeRef } from '../../../shared/hq'
 import { cn } from '@/lib/utils'
 import { RefChips } from './RefChips'
+
+const isRef = (x: unknown): x is Ref =>
+  typeof x === 'object' && x !== null && typeof (x as Ref).kind === 'string' && typeof (x as Ref).value === 'string'
 
 export interface HQInspectorProps {
   block: HQBlock
@@ -42,6 +45,13 @@ export function HQInspector(p: HQInspectorProps) {
    * `updated`) resets the drafts honestly; our own commits change the key,
    * which makes the just-committed draft stale — and it is simply ignored.
    */
+  // Read-only extras a generic block would otherwise drop (requests carry
+  // `options`, learnings carry `evidence`). Same defensive filtering as the views.
+  const readOnlyOptions: string[] = Array.isArray(p.block.options)
+    ? p.block.options.filter((o): o is string => typeof o === 'string')
+    : []
+  const readOnlyEvidence: Ref[] = Array.isArray(p.block.evidence) ? p.block.evidence.filter(isRef) : []
+
   const version = `${p.block.id}:${p.block.updated}`
   const [drafts, setDrafts] = useState<{ key: string; title: string; status: string; notes: string } | null>(
     null,
@@ -179,6 +189,25 @@ export function HQInspector(p: HQInspectorProps) {
               <div className="space-y-1.5">
                 <span className={labelCls}>Body</span>
                 <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#d7d3cc]">{p.block.body}</p>
+              </div>
+            )}
+            {readOnlyOptions.length > 0 && (
+              <div className="space-y-1.5">
+                <span className={labelCls}>Options</span>
+                <ol className="space-y-1">
+                  {readOnlyOptions.map((o, i) => (
+                    <li key={i} className="flex gap-2 text-sm leading-5 text-[#d7d3cc]">
+                      <span className="shrink-0 font-mono text-[#67656d]">{i + 1}.</span>
+                      <span className="min-w-0">{o}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+            {readOnlyEvidence.length > 0 && (
+              <div className="space-y-1.5">
+                <span className={labelCls}>Evidence</span>
+                <RefChips refs={readOnlyEvidence} />
               </div>
             )}
             <div className="space-y-2">

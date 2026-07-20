@@ -9,6 +9,8 @@ import { Loader2 } from 'lucide-react'
 import type { HQBlock } from '../../../shared/hq'
 import { cn } from '@/lib/utils'
 import { useHQStore } from '../../hooks/useHQStore'
+import { NOOP, useReadOnlyInspector } from '../../hooks/useReadOnlyInspector'
+import { HQInspector } from './HQInspector'
 import { HQNotices } from './HQNotices'
 import { RefChips } from './RefChips'
 
@@ -29,13 +31,15 @@ export function HQRequests() {
     [blocks],
   )
 
+  const inspector = useReadOnlyInspector(blocks)
   const loading = hq.data === null && hq.loadError === null
 
   return (
     <div
-      className="flex h-full flex-col bg-[#0b0b0d] text-[#d7d3cc]"
+      className="flex h-full bg-[#0b0b0d] text-[#d7d3cc]"
       style={{ fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }}
     >
+      <div className="flex min-w-0 flex-1 flex-col">
       <HQNotices
         storeFile="requests.jsonl"
         loadError={hq.loadError}
@@ -57,12 +61,19 @@ export function HQRequests() {
               {sorted.map((b) => {
                 const options = optionsOf(b)
                 const answered = b.status === 'answered'
+                const selected = inspector.selectedId === b.id
                 return (
-                  <article
+                  <button
                     key={b.id}
+                    type="button"
+                    onClick={() => inspector.select(b.id)}
                     className={cn(
-                      'rounded-lg border bg-[#121214] p-4',
-                      answered ? 'border-[#2a2a2e]' : 'border-[#d7a842]/40',
+                      'w-full rounded-lg border bg-[#121214] p-4 text-left transition-colors duration-150 hover:bg-[#171719]',
+                      selected
+                        ? 'border-[#d7a842]/70 bg-[#232225]'
+                        : answered
+                          ? 'border-[#2a2a2e]'
+                          : 'border-[#d7a842]/40',
                     )}
                   >
                     <div className="flex items-start gap-2">
@@ -93,13 +104,30 @@ export function HQRequests() {
                         <RefChips refs={b.refs} />
                       </div>
                     )}
-                  </article>
+                  </button>
                 )
               })}
             </div>
           )}
         </div>
       </div>
+      </div>
+
+      {inspector.block && (
+        <HQInspector
+          block={inspector.block}
+          open={inspector.open}
+          width={inspector.width}
+          pending={false}
+          statuses={[]}
+          refKinds={[]}
+          readOnly
+          onResize={inspector.resize}
+          onClose={inspector.close}
+          onPatch={NOOP}
+          onDelete={NOOP}
+        />
+      )}
     </div>
   )
 }

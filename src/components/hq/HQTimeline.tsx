@@ -13,7 +13,10 @@ import {
   matchesFilter,
   timeLabel,
 } from '../../lib/hqView'
+import { cn } from '@/lib/utils'
 import { useHQStore } from '../../hooks/useHQStore'
+import { NOOP, useReadOnlyInspector } from '../../hooks/useReadOnlyInspector'
+import { HQInspector } from './HQInspector'
 import { HQNotices } from './HQNotices'
 import { RefChips } from './RefChips'
 
@@ -29,14 +32,16 @@ export function HQTimeline() {
     return groupByDay(filtered, timeOf)
   }, [blocks, filter])
   const kindCount = useMemo(() => collectRefKinds(blocks).length, [blocks])
+  const inspector = useReadOnlyInspector(blocks)
 
   const loading = hq.data === null && hq.loadError === null
 
   return (
     <div
-      className="flex h-full flex-col bg-[#0b0b0d] text-[#d7d3cc]"
+      className="flex h-full bg-[#0b0b0d] text-[#d7d3cc]"
       style={{ fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }}
     >
+      <div className="flex min-w-0 flex-1 flex-col">
       <HQNotices
         storeFile="captains-log.jsonl"
         loadError={hq.loadError}
@@ -86,21 +91,29 @@ export function HQTimeline() {
                   {g.blocks.map((b) => {
                     const t = Date.parse(timeOf(b))
                     return (
-                      <li
-                        key={b.id}
-                        className="flex items-start gap-3 rounded-md border border-[#2a2a2e] bg-[#121214] px-3.5 py-2.5 transition-colors duration-150 hover:bg-[#171719]"
-                      >
-                        <span className="w-11 shrink-0 pt-0.5 font-mono text-[11px] tabular-nums text-[#8c8b91]">
-                          {Number.isNaN(t) ? '—' : timeLabel(new Date(t))}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm leading-5 text-[#f1efec]">{b.title}</p>
-                          {(b.refs ?? []).length > 0 && (
-                            <div className="mt-1.5">
-                              <RefChips refs={b.refs} />
-                            </div>
+                      <li key={b.id}>
+                        <button
+                          type="button"
+                          onClick={() => inspector.select(b.id)}
+                          className={cn(
+                            'flex w-full items-start gap-3 rounded-md border bg-[#121214] px-3.5 py-2.5 text-left transition-colors duration-150 hover:bg-[#171719]',
+                            inspector.selectedId === b.id
+                              ? 'border-[#d7a842]/50 bg-[#232225]'
+                              : 'border-[#2a2a2e]',
                           )}
-                        </div>
+                        >
+                          <span className="w-11 shrink-0 pt-0.5 font-mono text-[11px] tabular-nums text-[#8c8b91]">
+                            {Number.isNaN(t) ? '—' : timeLabel(new Date(t))}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm leading-5 text-[#f1efec]">{b.title}</p>
+                            {(b.refs ?? []).length > 0 && (
+                              <div className="mt-1.5">
+                                <RefChips refs={b.refs} />
+                              </div>
+                            )}
+                          </div>
+                        </button>
                       </li>
                     )
                   })}
@@ -110,6 +123,23 @@ export function HQTimeline() {
           )}
         </div>
       </div>
+      </div>
+
+      {inspector.block && (
+        <HQInspector
+          block={inspector.block}
+          open={inspector.open}
+          width={inspector.width}
+          pending={false}
+          statuses={[]}
+          refKinds={[]}
+          readOnly
+          onResize={inspector.resize}
+          onClose={inspector.close}
+          onPatch={NOOP}
+          onDelete={NOOP}
+        />
+      )}
     </div>
   )
 }

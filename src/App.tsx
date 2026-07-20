@@ -12,6 +12,7 @@ import { EMPTY_STORE, isFavorite, pushRecent, setHQLayout, toggleFavorite } from
 import { api } from './lib/api'
 import { baseName, rootName } from './lib/paths'
 import { buildTree, type TreeDir } from './lib/tree'
+import { storeSourceSubtitle } from './lib/hqView'
 import { selectionId, type DroppedFile, type Selection, type View } from './lib/ui'
 import { useFileIndex } from './hooks/useFileIndex'
 import { Sidebar } from './components/Sidebar'
@@ -64,6 +65,10 @@ export default function App() {
   const [view, setView] = useState<View>('docs')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [store, setStore] = useState<StoreData>(EMPTY_STORE)
+  // Resolved source directory of the HQ stores (from any store's payload), so
+  // record-view subtitles show the real path, not an asserted `data/`.
+  const [sourceDir, setSourceDir] = useState<string | null>(null)
+  const [sourceState, setSourceState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(() => loadSet(EXPANDED_KEY))
   const [collapsedRoots, setCollapsedRoots] = useState<Set<string>>(() => loadSet(COLLAPSED_KEY))
   const [dark, setDark] = useState<boolean>(() => {
@@ -100,6 +105,18 @@ export default function App() {
         setStore(s)
       })
       .catch(() => {})
+  }, [])
+
+  // All store payloads share the same middleware-resolved source dir, so one
+  // fixed fetch establishes it for every record-view subtitle.
+  useEffect(() => {
+    api
+      .hq('decisions')
+      .then((d) => {
+        setSourceDir(d.dir ?? null)
+        setSourceState('ready')
+      })
+      .catch(() => setSourceState('error'))
   }, [])
 
   /* ---------- content loading ---------- */
@@ -336,6 +353,7 @@ export default function App() {
     projects: 'projects.jsonl',
   }
   const hqTitle = HQ_TITLES[view]
+  const hqFile = HQ_STORE_FILE[view]
   const title =
     hqTitle ??
     (selection?.kind === 'ws'
@@ -345,7 +363,7 @@ export default function App() {
         : 'Novakai Docs')
   const subtitle =
     hqTitle !== undefined
-      ? (HQ_STORE_FILE[view] ? `Docs · data/${HQ_STORE_FILE[view]}` : '')
+      ? (hqFile ? storeSourceSubtitle(hqFile, sourceDir, sourceState) : '')
       : selection?.kind === 'ws'
         ? `${rootName(selection.root)} · ${selection.path}`
         : selection?.kind === 'drop'

@@ -10,6 +10,8 @@ import { Loader2 } from 'lucide-react'
 import type { HQBlock } from '../../../shared/hq'
 import { cn } from '@/lib/utils'
 import { useHQStore } from '../../hooks/useHQStore'
+import { NOOP, useReadOnlyInspector } from '../../hooks/useReadOnlyInspector'
+import { HQInspector } from './HQInspector'
 import { HQNotices } from './HQNotices'
 
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v : null)
@@ -42,13 +44,15 @@ export function HQOkrs() {
     return { objectives, krsByObjective, horizons }
   }, [blocks])
 
+  const inspector = useReadOnlyInspector(blocks)
   const loading = hq.data === null && hq.loadError === null
 
   return (
     <div
-      className="flex h-full flex-col bg-[#0b0b0d] text-[#d7d3cc]"
+      className="flex h-full bg-[#0b0b0d] text-[#d7d3cc]"
       style={{ fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }}
     >
+      <div className="flex min-w-0 flex-1 flex-col">
       <HQNotices
         storeFile="okrs.jsonl"
         loadError={hq.loadError}
@@ -79,27 +83,57 @@ export function HQOkrs() {
                       const intent = str(o.intent)
                       const krs = krsByObjective.get(o.id) ?? []
                       return (
-                        <article key={o.id} className="rounded-lg border border-[#2a2a2e] bg-[#121214] p-4">
-                          <p className="text-sm font-medium leading-5 text-[#f1efec]">{o.title}</p>
-                          {intent && <p className="mt-1 text-xs leading-5 text-[#8c8b91]">{intent}</p>}
+                        // Plain container: the objective header and each KR are
+                        // SIBLING buttons (never nested), so a KR click selects the
+                        // KR — it cannot bubble into the objective's own button.
+                        <article
+                          key={o.id}
+                          className={cn(
+                            'rounded-lg border bg-[#121214] p-4',
+                            inspector.selectedId === o.id ? 'border-[#d7a842]/50' : 'border-[#2a2a2e]',
+                          )}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => inspector.select(o.id)}
+                            className={cn(
+                              'block w-full rounded-md px-1 py-0.5 text-left transition-colors duration-150 hover:bg-[#171719]',
+                              inspector.selectedId === o.id && 'bg-[#232225]',
+                            )}
+                          >
+                            <p className="text-sm font-medium leading-5 text-[#f1efec]">{o.title}</p>
+                            {intent && <p className="mt-1 text-xs leading-5 text-[#8c8b91]">{intent}</p>}
+                          </button>
                           {krs.length > 0 && (
-                            <ul className="mt-3 space-y-1.5 border-l border-[#2a2a2e] pl-3">
+                            <ul className="mt-3 space-y-1 border-l border-[#2a2a2e] pl-2">
                               {krs.map((kr) => {
                                 const done = kr.status === 'done' || kr.status === 'closed'
                                 return (
-                                  <li key={kr.id} className="flex items-start gap-2 text-xs leading-5">
-                                    <span
+                                  <li key={kr.id}>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        inspector.select(kr.id)
+                                      }}
                                       className={cn(
-                                        'mt-1 h-1.5 w-1.5 shrink-0 rounded-full',
-                                        done ? 'bg-[#78a886]' : 'bg-[#d7a842]',
+                                        'flex w-full items-start gap-2 rounded-md px-1.5 py-1 text-left text-xs leading-5 transition-colors duration-150 hover:bg-[#171719]',
+                                        inspector.selectedId === kr.id && 'bg-[#232225]',
                                       )}
-                                    />
-                                    <span className="min-w-0 flex-1 text-[#d7d3cc]">
-                                      {str(kr.body) ?? kr.title}
-                                    </span>
-                                    {kr.status !== undefined && (
-                                      <span className="shrink-0 text-[10px] text-[#67656d]">{kr.status}</span>
-                                    )}
+                                    >
+                                      <span
+                                        className={cn(
+                                          'mt-1 h-1.5 w-1.5 shrink-0 rounded-full',
+                                          done ? 'bg-[#78a886]' : 'bg-[#d7a842]',
+                                        )}
+                                      />
+                                      <span className="min-w-0 flex-1 text-[#d7d3cc]">
+                                        {str(kr.body) ?? kr.title}
+                                      </span>
+                                      {kr.status !== undefined && (
+                                        <span className="shrink-0 text-[10px] text-[#67656d]">{kr.status}</span>
+                                      )}
+                                    </button>
                                   </li>
                                 )
                               })}
@@ -115,6 +149,23 @@ export function HQOkrs() {
           )}
         </div>
       </div>
+      </div>
+
+      {inspector.block && (
+        <HQInspector
+          block={inspector.block}
+          open={inspector.open}
+          width={inspector.width}
+          pending={false}
+          statuses={[]}
+          refKinds={[]}
+          readOnly
+          onResize={inspector.resize}
+          onClose={inspector.close}
+          onPatch={NOOP}
+          onDelete={NOOP}
+        />
+      )}
     </div>
   )
 }

@@ -22,6 +22,10 @@ import { TasksTab } from './components/TasksTab'
 import { HQBoard } from './components/hq/HQBoard'
 import { HQTimeline } from './components/hq/HQTimeline'
 import { HQProjects } from './components/hq/HQProjects'
+import { HQRecordList } from './components/hq/HQRecordList'
+import { HQRequests } from './components/hq/HQRequests'
+import { HQLearnings } from './components/hq/HQLearnings'
+import { HQOkrs } from './components/hq/HQOkrs'
 
 const LAYOUT_KEY = 'novakai-docs:layout'
 const LAST_KEY = 'novakai-docs:last'
@@ -312,13 +316,23 @@ export default function App() {
 
   const HQ_TITLES: Partial<Record<View, string>> = {
     tasks: 'Tasks',
-    board: 'Board',
-    timeline: 'Timeline',
+    decisions: 'Decisions',
+    requests: 'Requests',
+    missions: 'Missions',
+    board: 'Tasks',
+    'captains-log': 'Captain’s Log',
+    learnings: 'Learnings',
+    okrs: 'OKRs',
     projects: 'Projects',
   }
   const HQ_STORE_FILE: Partial<Record<View, string>> = {
+    decisions: 'decisions.jsonl',
+    requests: 'requests.jsonl',
+    missions: 'missions.jsonl',
     board: 'tasks.jsonl',
-    timeline: 'timeline.jsonl',
+    'captains-log': 'captains-log.jsonl',
+    learnings: 'learnings.jsonl',
+    okrs: 'okrs.jsonl',
     projects: 'projects.jsonl',
   }
   const hqTitle = HQ_TITLES[view]
@@ -331,7 +345,7 @@ export default function App() {
         : 'Novakai Docs')
   const subtitle =
     hqTitle !== undefined
-      ? (HQ_STORE_FILE[view] ? `HQ · data/${HQ_STORE_FILE[view]}` : '')
+      ? (HQ_STORE_FILE[view] ? `Docs · data/${HQ_STORE_FILE[view]}` : '')
       : selection?.kind === 'ws'
         ? `${rootName(selection.root)} · ${selection.path}`
         : selection?.kind === 'drop'
@@ -464,10 +478,20 @@ export default function App() {
             <div ref={contentScrollRef} className="flex-1 overflow-y-auto">
               {view === 'tasks' ? (
                 <TasksTab roots={roots} />
+              ) : view === 'decisions' ? (
+                <HQRecordList store="decisions" storeFile="decisions.jsonl" emptyLabel="No decisions recorded yet." />
+              ) : view === 'requests' ? (
+                <HQRequests />
+              ) : view === 'missions' ? (
+                <HQRecordList store="missions" storeFile="missions.jsonl" groupByStatus emptyLabel="No missions yet." />
               ) : view === 'board' ? (
                 <HQBoard layout={store.hqLayout} onLayout={onHQLayout} />
-              ) : view === 'timeline' ? (
+              ) : view === 'captains-log' ? (
                 <HQTimeline />
+              ) : view === 'learnings' ? (
+                <HQLearnings />
+              ) : view === 'okrs' ? (
+                <HQOkrs />
               ) : view === 'projects' ? (
                 <HQProjects layout={store.hqLayout} onLayout={onHQLayout} />
               ) : selection ? (

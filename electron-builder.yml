@@ -1,10 +1,9 @@
 # electron-builder.yml — packaging config for the desktop shell.
 # Validated to load (electron-builder info effective-config); a full package
-# build is intentionally not part of the gates. NOTE: the packaged app's
-# data/ location is an open question for the owner — the middleware anchors
-# data/ at appDir, which is read-only resources/app inside a packaged .app.
-appId: com.novakai.hq
-productName: Novakai HQ
+# build is intentionally not part of the gates. The packaged app anchors its
+# data/ and config files at userData (see DATA DIR note in electron/main.ts).
+appId: com.novakai.docs
+productName: Novakai Docs
 directories:
   output: release
 files:

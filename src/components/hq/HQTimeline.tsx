@@ -20,7 +20,7 @@ import { RefChips } from './RefChips'
 const timeOf = (b: HQBlock): string => (typeof b.at === 'string' ? b.at : b.created)
 
 export function HQTimeline() {
-  const hq = useHQStore('timeline')
+  const hq = useHQStore('captains-log')
   const [filter, setFilter] = useState('')
 
   const blocks = useMemo(() => hq.data?.blocks ?? [], [hq.data])
@@ -38,10 +38,11 @@ export function HQTimeline() {
       style={{ fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }}
     >
       <HQNotices
-        storeFile="timeline.jsonl"
+        storeFile="captains-log.jsonl"
         loadError={hq.loadError}
         mutationError={hq.mutationError}
         lineErrors={hq.data?.errors ?? []}
+        sourceError={hq.data?.sourceError}
       />
 
       <div className="mx-auto flex w-full max-w-3xl shrink-0 items-center gap-2 px-5 pt-4">

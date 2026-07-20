@@ -25,15 +25,30 @@ export interface HQBlock {
   [extra: string]: unknown
 }
 
-export type HQStoreName = 'tasks' | 'timeline' | 'decisions' | 'experiments' | 'projects' | 'content'
+/**
+ * The eight operating stores of the Novakai-Command system of record
+ * (.novakai/stores/<name>.jsonl). novakai-docs is a read-only lens over these;
+ * the old sample stores (timeline/experiments/content) are retired.
+ */
+export type HQStoreName =
+  | 'decisions'
+  | 'requests'
+  | 'missions'
+  | 'tasks'
+  | 'captains-log'
+  | 'learnings'
+  | 'okrs'
+  | 'projects'
 
 export const HQ_STORE_NAMES: readonly HQStoreName[] = [
-  'tasks',
-  'timeline',
   'decisions',
-  'experiments',
+  'requests',
+  'missions',
+  'tasks',
+  'captains-log',
+  'learnings',
+  'okrs',
   'projects',
-  'content',
 ]
 
 export interface HQLineError {
@@ -48,6 +63,19 @@ export interface HQStoreData {
   blocks: HQBlock[]
   errors: HQLineError[]
   generatedAt: number
+  /**
+   * Provenance (one resolved value shared by server guards and the UI):
+   * `external` stores are read-only; `internal` is the app's own writable data/.
+   */
+  source?: 'internal' | 'external'
+  readOnly?: boolean
+  /** The directory the store was resolved from — surfaced so the UI can name it. */
+  dir?: string
+  /**
+   * Store-level load failure (missing source dir, unreadable file) — distinct
+   * from per-line `errors`. Empty-but-present store has no sourceError.
+   */
+  sourceError?: string
 }
 
 export function isHQStoreName(x: unknown): x is HQStoreName {
@@ -79,7 +107,7 @@ export function isHQBlock(x: unknown): x is HQBlock {
 }
 
 /** Why a parsed line is not a block — the first broken required field. */
-function blockProblem(x: unknown): string {
+export function blockProblem(x: unknown): string {
   if (typeof x !== 'object' || x === null) return 'not an object'
   const b = x as HQBlock
   if (typeof b.id !== 'string' || b.id.length === 0) return 'missing id'

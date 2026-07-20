@@ -6,7 +6,7 @@
  * Column widths drag-resize and persist in StoreData.hqLayout.
  */
 import { useMemo, useRef, useState } from 'react'
-import { Loader2, Plus } from 'lucide-react'
+import { Archive, Loader2, Plus } from 'lucide-react'
 import type { HQBlock } from '../../../shared/hq'
 import { moveBlock, patchBlock } from '../../../shared/hq'
 import type { HQLayout } from '../../../shared/types'
@@ -48,7 +48,14 @@ export function HQBoard({ layout, onLayout }: HQBoardProps) {
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null)
 
   const blocks = useMemo(() => hq.data?.blocks ?? [], [hq.data])
-  const buckets = useMemo(() => bucketByStatus(blocks), [blocks])
+  // Default to read-only until the server says otherwise — never expose writes
+  // to the system of record on an unproven payload.
+  const readOnly = hq.data?.readOnly ?? true
+  // Refile tombstones are historical redirects, not actionable work: keep them
+  // out of the active columns and show them in a separate archive strip.
+  const active = useMemo(() => blocks.filter((b) => b.status !== 'refiled'), [blocks])
+  const refiled = useMemo(() => blocks.filter((b) => b.status === 'refiled'), [blocks])
+  const buckets = useMemo(() => bucketByStatus(active), [active])
   const refKinds = useMemo(() => collectRefKinds(blocks), [blocks])
   const statuses = useMemo(
     () => [...new Set([...BOARD_COLUMNS, ...collectStatuses(blocks)])].sort(),
@@ -174,6 +181,7 @@ export function HQBoard({ layout, onLayout }: HQBoardProps) {
           loadError={hq.loadError}
           mutationError={hq.mutationError}
           lineErrors={hq.data?.errors ?? []}
+          sourceError={hq.data?.sourceError}
         />
 
         {loading ? (
@@ -181,6 +189,7 @@ export function HQBoard({ layout, onLayout }: HQBoardProps) {
             <Loader2 className="h-4 w-4 animate-spin" /> Loading tasks…
           </div>
         ) : (
+          <div className="flex min-h-0 flex-1 flex-col">
           <div className="flex flex-1 gap-4 overflow-x-auto p-5">
             {BOARD_COLUMNS.map((column) => {
               const cards = buckets.columns[column]
@@ -218,7 +227,7 @@ export function HQBoard({ layout, onLayout }: HQBoardProps) {
                     />
                   </header>
 
-                  {column === 'todo' && (
+                  {column === 'todo' && !readOnly && (
                     <form
                       className="flex shrink-0 gap-1.5 border-b border-[#2a2a2e] p-2.5"
                       onSubmit={(e) => {
@@ -251,7 +260,7 @@ export function HQBoard({ layout, onLayout }: HQBoardProps) {
                   >
                     {cards.length === 0 && (
                       <p className="px-1 py-6 text-center text-xs text-[#67656d]">
-                        {column === 'todo' ? 'No blocks yet — add one above.' : 'Nothing here yet.'}
+                        {column === 'todo' && !readOnly ? 'No blocks yet — add one above.' : 'Nothing here yet.'}
                       </p>
                     )}
                     {cards.map((b) => (
@@ -260,17 +269,19 @@ export function HQBoard({ layout, onLayout }: HQBoardProps) {
                           <div className="mb-2 h-0.5 rounded-full bg-[#d7a842]" />
                         )}
                         <article
-                          draggable
+                          draggable={!readOnly}
                           onDragStart={(e) => {
+                            if (readOnly) return
                             e.dataTransfer.setData('text/hq-block', b.id)
                             e.dataTransfer.effectAllowed = 'move'
                             setDragId(b.id)
                           }}
                           onDragEnd={clearDrag}
-                          onDragOver={onCardDragOver(column, b.id)}
+                          onDragOver={readOnly ? undefined : onCardDragOver(column, b.id)}
                           onClick={() => inspector.select(b.id)}
                           className={cn(
-                            'cursor-grab rounded-md border border-[#2a2a2e] bg-[#171719] p-3 transition-all duration-150 hover:border-[#3a3a3f] hover:bg-[#1c1c1f]',
+                            'rounded-md border border-[#2a2a2e] bg-[#171719] p-3 transition-all duration-150 hover:border-[#3a3a3f] hover:bg-[#1c1c1f]',
+                            readOnly ? 'cursor-pointer' : 'cursor-grab',
                             dragId === b.id && 'opacity-40',
                             inspector.selectedId === b.id && 'border-[#d7a842]/50 bg-[#232225]',
                           )}
@@ -304,6 +315,41 @@ export function HQBoard({ layout, onLayout }: HQBoardProps) {
               )
             })}
           </div>
+
+          {refiled.length > 0 && (
+            <div className="shrink-0 border-t border-[#2a2a2e] px-5 py-3">
+              <div className="mb-1.5 flex items-center gap-2">
+                <Archive className="h-3 w-3 text-[#67656d]" />
+                <span className="text-[9px] font-medium uppercase tracking-[0.12em] text-[#67656d]">
+                  Refiled
+                </span>
+                <span className="rounded-full bg-[#171719] px-1.5 py-0.5 text-[10px] leading-3 text-[#8c8b91]">
+                  {refiled.length}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {refiled.map((b) => {
+                  const to = typeof b.refiledTo === 'string' ? b.refiledTo : null
+                  return (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => inspector.select(b.id)}
+                      title={to ? `Refiled → ${to}` : b.title}
+                      className={cn(
+                        'flex max-w-full items-center gap-1.5 rounded-md border border-[#2a2a2e] bg-[#121214] px-2 py-1 text-left transition-colors duration-150 hover:border-[#3a3a3f] hover:bg-[#171719]',
+                        inspector.selectedId === b.id && 'border-[#d7a842]/50 bg-[#232225]',
+                      )}
+                    >
+                      <span className="truncate text-[11px] text-[#8c8b91] line-through">{b.title}</span>
+                      {to && <span className="shrink-0 font-mono text-[10px] text-[#67656d]">→ {to}</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+          </div>
         )}
       </div>
 
@@ -315,6 +361,7 @@ export function HQBoard({ layout, onLayout }: HQBoardProps) {
           pending={hq.pending}
           statuses={statuses}
           refKinds={refKinds}
+          readOnly={readOnly}
           onResize={inspector.resize}
           onClose={inspector.close}
           onPatch={inspector.patch}

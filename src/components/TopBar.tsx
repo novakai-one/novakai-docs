@@ -7,20 +7,39 @@ import {
   ExternalLink,
   Eye,
   FileCode,
+  FileText,
   FolderKanban,
-  History,
+  Gavel,
+  Goal,
+  Inbox,
   KanbanSquare,
-  ListTodo,
+  Lightbulb,
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
   RefreshCw,
+  Rocket,
+  ScrollText,
   Star,
   Sun,
+  type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { View } from '../lib/ui'
+import { RECORD_VIEWS } from '../lib/ui'
+
+/** Nav metadata for the eight read-only record-store views. */
+const RECORD_NAV: Record<(typeof RECORD_VIEWS)[number], { label: string; icon: LucideIcon; store: string }> = {
+  decisions: { label: 'Decisions', icon: Gavel, store: 'decisions.jsonl' },
+  requests: { label: 'Requests', icon: Inbox, store: 'requests.jsonl' },
+  missions: { label: 'Missions', icon: Rocket, store: 'missions.jsonl' },
+  board: { label: 'Tasks', icon: KanbanSquare, store: 'tasks.jsonl' },
+  'captains-log': { label: 'Log', icon: ScrollText, store: 'captains-log.jsonl' },
+  learnings: { label: 'Learnings', icon: Lightbulb, store: 'learnings.jsonl' },
+  okrs: { label: 'OKRs', icon: Goal, store: 'okrs.jsonl' },
+  projects: { label: 'Projects', icon: FolderKanban, store: 'projects.jsonl' },
+}
 
 export interface TopBarProps {
   title: string
@@ -53,55 +72,35 @@ export function TopBar(p: TopBarProps) {
         <div className="truncate text-sm font-medium">{p.title}</div>
         {p.subtitle && <div className="truncate text-xs text-muted-foreground">{p.subtitle}</div>}
       </div>
-      <div className="flex items-center rounded-md border p-0.5">
+      <nav className="flex min-w-0 max-w-[54%] items-center gap-0.5 overflow-x-auto rounded-md border p-0.5">
         <Button
           variant={p.view === 'docs' ? 'secondary' : 'ghost'}
           size="sm"
-          className="h-7 px-2"
+          className="h-7 shrink-0 gap-1 px-2"
           onClick={() => p.onViewChange('docs')}
         >
+          <FileText className="h-3.5 w-3.5" />
           Docs
         </Button>
-        <Button
-          variant={p.view === 'tasks' ? 'secondary' : 'ghost'}
-          size="sm"
-          className="h-7 gap-1 px-2"
-          onClick={() => p.onViewChange('tasks')}
-        >
-          <ListTodo className="h-3.5 w-3.5" />
-          Tasks
-        </Button>
-        <Button
-          variant={p.view === 'board' ? 'secondary' : 'ghost'}
-          size="sm"
-          className="h-7 gap-1 px-2"
-          title="HQ board over data/tasks.jsonl"
-          onClick={() => p.onViewChange('board')}
-        >
-          <KanbanSquare className="h-3.5 w-3.5" />
-          Board
-        </Button>
-        <Button
-          variant={p.view === 'timeline' ? 'secondary' : 'ghost'}
-          size="sm"
-          className="h-7 gap-1 px-2"
-          title="HQ timeline over data/timeline.jsonl"
-          onClick={() => p.onViewChange('timeline')}
-        >
-          <History className="h-3.5 w-3.5" />
-          Timeline
-        </Button>
-        <Button
-          variant={p.view === 'projects' ? 'secondary' : 'ghost'}
-          size="sm"
-          className="h-7 gap-1 px-2"
-          title="HQ projects over data/projects.jsonl"
-          onClick={() => p.onViewChange('projects')}
-        >
-          <FolderKanban className="h-3.5 w-3.5" />
-          Projects
-        </Button>
-      </div>
+        <span className="mx-0.5 h-4 w-px shrink-0 bg-border" aria-hidden />
+        {RECORD_VIEWS.map((v) => {
+          const nav = RECORD_NAV[v]
+          const Icon = nav.icon
+          return (
+            <Button
+              key={v}
+              variant={p.view === v ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-7 shrink-0 gap-1 px-2"
+              title={`Read-only view over ${nav.store}`}
+              onClick={() => p.onViewChange(v)}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {nav.label}
+            </Button>
+          )
+        })}
+      </nav>
       {p.isFile && (
         <>
           <Button

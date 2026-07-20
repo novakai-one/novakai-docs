@@ -1,4 +1,4 @@
-# data/ — the Novakai HQ stores
+# data/ — the Novakai Docs stores
 
 Typed-block JSONL everywhere. One block per line, one store per file.
 

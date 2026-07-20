@@ -11,11 +11,9 @@
  * plumbing only: server, window, bounds persistence, single instance.
  *
  * DATA DIR: the middleware anchors data/ (and the roots/store config files)
- * at appDir = app.getAppPath() — the repo root under `npm run desktop`, so
- * data/ is found exactly like under `npm run dev`. PACKAGED-APP DATA
- * LOCATION IS AN OPEN QUESTION FOR THE OWNER: inside a packaged .app,
- * appDir is read-only resources/app — data/ probably belongs in userData.
- * Not solved here on purpose.
+ * at a writable dataDir — the repo root under `npm run desktop` (identical
+ * to `npm run dev`), and userData when packaged, because inside a packaged
+ * .app, app.getAppPath() is read-only resources/app.
  */
 import { app, BrowserWindow, screen } from 'electron'
 import fs from 'node:fs'
@@ -23,7 +21,7 @@ import http from 'node:http'
 import path from 'node:path'
 import { createMdApiMiddleware } from '../server/middleware'
 
-const APP_NAME = 'Novakai HQ'
+const APP_NAME = 'Novakai Docs'
 const isMac = process.platform === 'darwin'
 
 const DEFAULT_WIDTH = 1440
@@ -53,6 +51,10 @@ const MIME: Record<string, string> = {
 
 const appDir = app.getAppPath()
 const distDir = path.join(appDir, 'dist')
+// Writable anchor for data/ and the roots/store config files. In dev this is
+// the repo root; in the packaged app resources/app is read-only, so use
+// userData (~/Library/Application Support/Novakai HQ).
+const dataDir = app.isPackaged ? app.getPath('userData') : appDir
 
 /* ---------- loopback server: API middleware + static dist/ ---------- */
 
@@ -78,7 +80,7 @@ function serveStatic(pathname: string, res: http.ServerResponse): void {
 }
 
 async function startServer(): Promise<string> {
-  const api = createMdApiMiddleware({ appDir })
+  const api = createMdApiMiddleware({ appDir: dataDir })
   const server = http.createServer((req, res) => {
     const url = new URL(req.url || '/', 'http://127.0.0.1')
     if (url.pathname.startsWith('/api/')) {

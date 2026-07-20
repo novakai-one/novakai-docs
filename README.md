@@ -74,10 +74,10 @@ bounds persist to `userData/window-bounds.json`; a single-instance lock focuses 
 window on relaunch; macOS keeps the app alive when the window closes. The main process is
 typechecked via `tsconfig.electron.json` (part of `npm run typecheck`).
 
-**Data dir note:** the middleware anchors `data/` (and the roots/store config files) at the
-app dir — the repo root under `npm run desktop`, identical to `npm run dev`. The packaged-app
-data location (repo checkout vs `userData`) is an open question — see the comment in
-`electron/main.ts`.
+**Data dir note:** the middleware anchors `data/` (and the roots/store config files) at a
+writable directory — the repo root under `npm run desktop` / `npm run dev`, and
+`userData` (`~/Library/Application Support/Novakai HQ`) in the packaged app, since the
+bundled `resources/app` is read-only. See the DATA DIR note in `electron/main.ts`.
 
 ## Standards (as in Novakai-Analytics `STANDARDS.md`)
 

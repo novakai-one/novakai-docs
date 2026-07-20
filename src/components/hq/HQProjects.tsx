@@ -27,6 +27,7 @@ export function HQProjects({ layout, onLayout }: HQProjectsProps) {
   const inspector = useHQInspector('projects', hq, layout, onLayout)
 
   const blocks = useMemo(() => hq.data?.blocks ?? [], [hq.data])
+  const readOnly = hq.data?.readOnly ?? true
   const refKinds = useMemo(() => collectRefKinds(blocks), [blocks])
   const statuses = useMemo(() => collectStatuses(blocks), [blocks])
 
@@ -43,6 +44,7 @@ export function HQProjects({ layout, onLayout }: HQProjectsProps) {
           loadError={hq.loadError}
           mutationError={hq.mutationError}
           lineErrors={hq.data?.errors ?? []}
+          sourceError={hq.data?.sourceError}
         />
 
         <div className="flex-1 overflow-y-auto p-5">
@@ -115,6 +117,7 @@ export function HQProjects({ layout, onLayout }: HQProjectsProps) {
           pending={hq.pending}
           statuses={statuses}
           refKinds={refKinds}
+          readOnly={readOnly}
           onResize={inspector.resize}
           onClose={inspector.close}
           onPatch={inspector.patch}

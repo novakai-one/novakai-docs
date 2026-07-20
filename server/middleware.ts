@@ -26,7 +26,7 @@ import { addTask, editTask, removeTask, setStatus } from '../shared/tasks'
 import { defaultRoots, expandHome, loadRoots, ROOTS_CONFIG_FILE, saveRoots } from './config'
 import { dedupFiles } from './dedup'
 import { createHashCache } from './hashing'
-import { HQ_DIR, loadHQStore, saveHQStore } from './hqFile'
+import { HQ_DIR, loadExternalStore, loadHQStore, saveHQStore } from './hqFile'
 import { MD_RE, scanRoot } from './scanner'
 import type { RawFile } from './scanner'
 import { isStoreData, loadStore, saveStore, STORE_FILE } from './storeFile'
@@ -37,6 +37,12 @@ export interface MdApiDeps {
   appDir: string
   /** Override the initial roots (defaults: parent of appDir + ~/Programming). */
   roots?: string[]
+  /**
+   * Absolute directory of the EXTERNAL record stores (Novakai-Command's
+   * .novakai/stores). When set (or via NVK_STORES_DIR), the HQ stores are served
+   * read-only from here instead of the app's writable `data/`.
+   */
+  storesDir?: string
 }
 
 const MIME: Record<string, string> = {
@@ -95,6 +101,18 @@ export function createMdApiMiddleware(deps: MdApiDeps) {
   const hqDir = path.join(deps.appDir, HQ_DIR)
   let roots = deps.roots ?? loadRoots(configFile, defaultRoots(deps.appDir))
   const hashCache = createHashCache()
+
+  /**
+   * ONE resolved provenance value: deps.storesDir or a non-empty NVK_STORES_DIR
+   * ⇒ external + read-only; the internal appDir/data fallback ⇒ writable. The
+   * same value drives the GET payload AND every write guard — read-only is never
+   * inferred twice, so there is no way for the server and UI to disagree.
+   */
+  const envStores = process.env.NVK_STORES_DIR?.trim()
+  const externalDir = deps.storesDir?.trim() || envStores || ''
+  const hqSource = externalDir
+    ? { dir: path.resolve(expandHome(externalDir)), readOnly: true, source: 'external' as const }
+    : { dir: hqDir, readOnly: false, source: 'internal' as const }
 
   const rootInfo = (): RootInfo[] =>
     roots.map((r) => ({ path: r, name: path.basename(r) || r }))
@@ -323,10 +341,29 @@ export function createMdApiMiddleware(deps: MdApiDeps) {
         return
       }
       try {
-        sendJson(res, 200, loadHQStore(hqDir, store) satisfies HQStoreData)
+        const data = hqSource.readOnly
+          ? loadExternalStore(hqSource.dir, store)
+          : loadHQStore(hqSource.dir, store)
+        sendJson(res, 200, {
+          ...data,
+          source: hqSource.source,
+          readOnly: hqSource.readOnly,
+          dir: hqSource.dir,
+        } satisfies HQStoreData)
       } catch (err) {
         sendError(res, 500, String(err))
       }
+      return
+    }
+
+    // The record stores are a read-only lens: every mutation is refused before
+    // any body read, load, or save can reach the external JSONL files.
+    if (
+      hqSource.readOnly &&
+      (pathname === API.hq || pathname.startsWith(`${API.hq}/`)) &&
+      req.method !== 'GET'
+    ) {
+      sendError(res, 405, 'stores are read-only')
       return
     }
 

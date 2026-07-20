@@ -22,6 +22,8 @@ export interface HQInspectorProps {
   /** Suggestions only — both inputs stay free text. */
   statuses: string[]
   refKinds: string[]
+  /** Read-only lens over an external store: no edits, no delete, no ref-add. */
+  readOnly?: boolean
   onResize: (width: number) => void
   onClose: () => void
   onPatch: (patch: Record<string, unknown>) => void
@@ -155,6 +157,40 @@ export function HQInspector(p: HQInspectorProps) {
           </button>
         </div>
 
+        {p.readOnly ? (
+          <div className="flex-1 space-y-5 overflow-y-auto p-4">
+            <div className="space-y-1.5">
+              <span className={labelCls}>Title</span>
+              <p className="text-sm leading-5 text-[#f1efec]">{p.block.title}</p>
+            </div>
+            {p.block.status !== undefined && (
+              <div className="space-y-1.5">
+                <span className={labelCls}>Status</span>
+                <p className="text-sm text-[#d7d3cc]">{p.block.status}</p>
+              </div>
+            )}
+            {p.block.notes !== undefined && p.block.notes !== '' && (
+              <div className="space-y-1.5">
+                <span className={labelCls}>Notes</span>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#d7d3cc]">{p.block.notes}</p>
+              </div>
+            )}
+            {typeof p.block.body === 'string' && p.block.body !== '' && (
+              <div className="space-y-1.5">
+                <span className={labelCls}>Body</span>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#d7d3cc]">{p.block.body}</p>
+              </div>
+            )}
+            <div className="space-y-2">
+              <span className={labelCls}>Refs</span>
+              {(p.block.refs ?? []).length > 0 ? (
+                <RefChips refs={p.block.refs} />
+              ) : (
+                <p className="text-xs text-[#8c8b91]">No refs.</p>
+              )}
+            </div>
+          </div>
+        ) : (
         <div className="flex-1 space-y-5 overflow-y-auto p-4">
           <div className="space-y-1.5">
             <label className={labelCls} htmlFor="hq-inspector-title">
@@ -269,7 +305,9 @@ export function HQInspector(p: HQInspectorProps) {
             </div>
           </div>
         </div>
+        )}
 
+        {!p.readOnly && (
         <div className="shrink-0 border-t border-[#2a2a2e] p-3">
           <button
             type="button"
@@ -282,6 +320,7 @@ export function HQInspector(p: HQInspectorProps) {
             Delete block
           </button>
         </div>
+        )}
       </aside>
     </div>
   )

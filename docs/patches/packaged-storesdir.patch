@@ -1,0 +1,44 @@
+# Packaged storesDir wiring — HANDOFF PATCH (SEVERE-3)
+#
+# electron/main.ts is dirty from another session's data-dir work, and the one
+# line this needs to change (`createMdApiMiddleware({ appDir: dataDir })`) is a
+# line that session just modified. Per the coordination rule this is a collision,
+# not an additive edit — so the change ships here for the file's owner to apply
+# rather than being written directly.
+#
+# WHY THIS IS REQUIRED: a Finder-launched .app does not inherit an interactive
+# shell's environment, so NVK_STORES_DIR alone never reaches the packaged app and
+# it falls back to the unseeded `userData/data` — the exact empty-store bug this
+# mission removes. A durable absolute default passed into the middleware fixes it.
+# The middleware already accepts `storesDir` (env still overrides it), so this is
+# the only remaining wire.
+#
+# APPLY (from repo root, on top of the current electron/main.ts):
+#   git apply docs/patches/packaged-storesdir.patch
+# If context has drifted, apply the two edits by hand — they are trivial.
+
+--- a/electron/main.ts
++++ b/electron/main.ts
+@@ -54,6 +54,13 @@ const distDir = path.join(appDir, 'dist')
+ // the repo root; in the packaged app resources/app is read-only, so use
+ // userData (~/Library/Application Support/Novakai HQ).
+ const dataDir = app.isPackaged ? app.getPath('userData') : appDir
++
++// External Novakai-Command record stores (read-only lens). Durable absolute
++// default + env override. A packaged .app launched from Finder does not inherit
++// a shell env, so this default — not NVK_STORES_DIR — is what locates the stores.
++const STORES_DIR =
++  process.env.NVK_STORES_DIR ||
++  '/Users/christopherdasca/Programming/Novakai-Command/.novakai/stores'
+
+ /* ---------- loopback server: API middleware + static dist/ ---------- */
+
+@@ -80,7 +87,7 @@ function serveStatic(pathname: string, res: http.ServerResponse): void {
+ }
+
+ async function startServer(): Promise<string> {
+-  const api = createMdApiMiddleware({ appDir: dataDir })
++  const api = createMdApiMiddleware({ appDir: dataDir, storesDir: STORES_DIR })
+   const server = http.createServer((req, res) => {
+     const url = new URL(req.url || '/', 'http://127.0.0.1')
+     if (url.pathname.startsWith('/api/')) {

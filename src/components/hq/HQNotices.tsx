@@ -10,13 +10,23 @@ export interface HQNoticesProps {
   loadError: string | null
   mutationError: string | null
   lineErrors: HQLineError[]
+  /** Store-level source failure (missing source dir, unreadable file). */
+  sourceError?: string | null
 }
 
-export function HQNotices({ storeFile, loadError, mutationError, lineErrors }: HQNoticesProps) {
-  if (!loadError && !mutationError && lineErrors.length === 0) return null
+export function HQNotices({ storeFile, loadError, mutationError, lineErrors, sourceError }: HQNoticesProps) {
+  if (!loadError && !mutationError && !sourceError && lineErrors.length === 0) return null
   const lines = lineErrors.map((e) => e.line).join(', ')
   return (
     <div className="space-y-1.5 px-5 pt-3">
+      {sourceError && (
+        <div className="flex items-center gap-2 rounded-md border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">
+          <CircleAlert className="h-3.5 w-3.5 shrink-0" />
+          <span className="min-w-0 truncate" title={sourceError}>
+            {storeFile} unavailable: {sourceError}
+          </span>
+        </div>
+      )}
       {loadError && (
         <div className="flex items-center gap-2 rounded-md border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-300">
           <CircleAlert className="h-3.5 w-3.5 shrink-0" />

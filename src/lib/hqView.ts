@@ -109,6 +109,23 @@ export function collectStatuses(blocks: readonly HQBlock[]): string[] {
   return [...statuses].sort()
 }
 
+/**
+ * Honest source subtitle for an HQ store view. Uses the payload's resolved `dir`
+ * whenever it is known — internal or external, both are the truthful directory —
+ * with a trailing slash normalized before the filename. When the source is not
+ * yet established it shows a neutral loading/failed state, never an asserted
+ * `data/…` path the app can't stand behind.
+ */
+export function storeSourceSubtitle(
+  storeFile: string,
+  dir: string | null,
+  state: 'loading' | 'ready' | 'error',
+): string {
+  if (dir) return `${dir.replace(/\/+$/, '')}/${storeFile}`
+  if (state === 'loading') return 'Resolving source…'
+  return 'Source unavailable'
+}
+
 /** Cheap text filter: title, notes, and ref values/kinds. */
 export function matchesFilter(b: HQBlock, q: string): boolean {
   const needle = q.trim().toLowerCase()

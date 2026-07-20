@@ -9,10 +9,13 @@
  */
 import { useRef, useState } from 'react'
 import { Loader2, Plus, Trash2, X } from 'lucide-react'
-import type { HQBlock } from '../../../shared/hq'
+import type { HQBlock, Ref } from '../../../shared/hq'
 import { addRef, removeRef } from '../../../shared/hq'
 import { cn } from '@/lib/utils'
 import { RefChips } from './RefChips'
+
+const isRef = (x: unknown): x is Ref =>
+  typeof x === 'object' && x !== null && typeof (x as Ref).kind === 'string' && typeof (x as Ref).value === 'string'
 
 export interface HQInspectorProps {
   block: HQBlock
@@ -22,6 +25,8 @@ export interface HQInspectorProps {
   /** Suggestions only — both inputs stay free text. */
   statuses: string[]
   refKinds: string[]
+  /** Read-only lens over an external store: no edits, no delete, no ref-add. */
+  readOnly?: boolean
   onResize: (width: number) => void
   onClose: () => void
   onPatch: (patch: Record<string, unknown>) => void
@@ -40,6 +45,13 @@ export function HQInspector(p: HQInspectorProps) {
    * `updated`) resets the drafts honestly; our own commits change the key,
    * which makes the just-committed draft stale — and it is simply ignored.
    */
+  // Read-only extras a generic block would otherwise drop (requests carry
+  // `options`, learnings carry `evidence`). Same defensive filtering as the views.
+  const readOnlyOptions: string[] = Array.isArray(p.block.options)
+    ? p.block.options.filter((o): o is string => typeof o === 'string')
+    : []
+  const readOnlyEvidence: Ref[] = Array.isArray(p.block.evidence) ? p.block.evidence.filter(isRef) : []
+
   const version = `${p.block.id}:${p.block.updated}`
   const [drafts, setDrafts] = useState<{ key: string; title: string; status: string; notes: string } | null>(
     null,
@@ -155,6 +167,59 @@ export function HQInspector(p: HQInspectorProps) {
           </button>
         </div>
 
+        {p.readOnly ? (
+          <div className="flex-1 space-y-5 overflow-y-auto p-4">
+            <div className="space-y-1.5">
+              <span className={labelCls}>Title</span>
+              <p className="text-sm leading-5 text-[#f1efec]">{p.block.title}</p>
+            </div>
+            {p.block.status !== undefined && (
+              <div className="space-y-1.5">
+                <span className={labelCls}>Status</span>
+                <p className="text-sm text-[#d7d3cc]">{p.block.status}</p>
+              </div>
+            )}
+            {p.block.notes !== undefined && p.block.notes !== '' && (
+              <div className="space-y-1.5">
+                <span className={labelCls}>Notes</span>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#d7d3cc]">{p.block.notes}</p>
+              </div>
+            )}
+            {typeof p.block.body === 'string' && p.block.body !== '' && (
+              <div className="space-y-1.5">
+                <span className={labelCls}>Body</span>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#d7d3cc]">{p.block.body}</p>
+              </div>
+            )}
+            {readOnlyOptions.length > 0 && (
+              <div className="space-y-1.5">
+                <span className={labelCls}>Options</span>
+                <ol className="space-y-1">
+                  {readOnlyOptions.map((o, i) => (
+                    <li key={i} className="flex gap-2 text-sm leading-5 text-[#d7d3cc]">
+                      <span className="shrink-0 font-mono text-[#67656d]">{i + 1}.</span>
+                      <span className="min-w-0">{o}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+            {readOnlyEvidence.length > 0 && (
+              <div className="space-y-1.5">
+                <span className={labelCls}>Evidence</span>
+                <RefChips refs={readOnlyEvidence} />
+              </div>
+            )}
+            <div className="space-y-2">
+              <span className={labelCls}>Refs</span>
+              {(p.block.refs ?? []).length > 0 ? (
+                <RefChips refs={p.block.refs} />
+              ) : (
+                <p className="text-xs text-[#8c8b91]">No refs.</p>
+              )}
+            </div>
+          </div>
+        ) : (
         <div className="flex-1 space-y-5 overflow-y-auto p-4">
           <div className="space-y-1.5">
             <label className={labelCls} htmlFor="hq-inspector-title">
@@ -269,7 +334,9 @@ export function HQInspector(p: HQInspectorProps) {
             </div>
           </div>
         </div>
+        )}
 
+        {!p.readOnly && (
         <div className="shrink-0 border-t border-[#2a2a2e] p-3">
           <button
             type="button"
@@ -282,6 +349,7 @@ export function HQInspector(p: HQInspectorProps) {
             Delete block
           </button>
         </div>
+        )}
       </aside>
     </div>
   )

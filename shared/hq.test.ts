@@ -12,6 +12,7 @@ import {
   removeRef,
   serializeHQJsonl,
 } from './hq'
+import { adaptExternalBlock, parseExternalJsonl } from './hqAdapt'
 
 const T = '2026-01-01T00:00:00.000Z'
 
@@ -25,9 +26,13 @@ const block = (id: string, extra: Partial<HQBlock> = {}): HQBlock => ({
 })
 
 describe('isHQStoreName', () => {
-  it('accepts the six known stores and rejects everything else', () => {
-    for (const s of ['tasks', 'timeline', 'decisions', 'experiments', 'projects', 'content'])
+  it('accepts the eight record stores and rejects everything else', () => {
+    for (const s of ['decisions', 'requests', 'missions', 'tasks', 'captains-log', 'learnings', 'okrs', 'projects'])
       expect(isHQStoreName(s)).toBe(true)
+    // retired sample stores are no longer valid
+    expect(isHQStoreName('timeline')).toBe(false)
+    expect(isHQStoreName('experiments')).toBe(false)
+    expect(isHQStoreName('content')).toBe(false)
     expect(isHQStoreName('task')).toBe(false)
     expect(isHQStoreName('')).toBe(false)
     expect(isHQStoreName(undefined)).toBe(false)
@@ -178,6 +183,65 @@ describe('moveBlock', () => {
     expect(moveBlock(three, 'nope', 0)).toEqual(three)
     moveBlock(three, 'a', 2)
     expect(three.map((b) => b.id)).toEqual(['a', 'b', 'c'])
+  })
+})
+
+describe('adaptExternalBlock', () => {
+  it('maps ts→created/updated and derives title from the first body line', () => {
+    const r = adaptExternalBlock({ id: 'log_1', kind: 'log', ts: T, body: 'Did the thing.\nDetails.' })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.block.created).toBe(T)
+    expect(r.block.updated).toBe(T)
+    expect(r.block.title).toBe('Did the thing.')
+    expect(r.block.ts).toBe(T) // passthrough preserved
+  })
+
+  it('falls back created to updated for the refile tombstone, title to id', () => {
+    const r = adaptExternalBlock({ id: 'task_x', kind: 'task', status: 'refiled', refiledTo: 'm1', updated: T })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.block.created).toBe(T)
+    expect(r.block.updated).toBe(T)
+    expect(r.block.title).toBe('task_x')
+  })
+
+  it('prefers explicit title, then question, then body, then id', () => {
+    expect((adaptExternalBlock({ id: 'a', kind: 'k', ts: T, title: 'T', question: 'Q', body: 'B' }) as { block: HQBlock }).block.title).toBe('T')
+    expect((adaptExternalBlock({ id: 'a', kind: 'k', ts: T, question: 'Q', body: 'B' }) as { block: HQBlock }).block.title).toBe('Q')
+    expect((adaptExternalBlock({ id: 'a', kind: 'k', ts: T, body: 'B' }) as { block: HQBlock }).block.title).toBe('B')
+    expect((adaptExternalBlock({ id: 'a', kind: 'k', ts: T }) as { block: HQBlock }).block.title).toBe('a')
+  })
+
+  it('errors on missing id/kind and validates after normalizing (malformed refs)', () => {
+    expect(adaptExternalBlock({ kind: 'k', ts: T })).toEqual({ ok: false, error: 'missing id' })
+    expect(adaptExternalBlock({ id: 'a', ts: T })).toEqual({ ok: false, error: 'missing kind' })
+    expect(adaptExternalBlock('nope')).toEqual({ ok: false, error: 'not an object' })
+    // passes id/kind but the normalized block still violates the contract
+    expect(adaptExternalBlock({ id: 'a', kind: 'k', ts: T, refs: [{ kind: 'pr' }] })).toEqual({
+      ok: false,
+      error: 'refs is not Ref[]',
+    })
+    // no created/ts/updated at all → created stays undefined → contract violation
+    expect(adaptExternalBlock({ id: 'a', kind: 'k' })).toEqual({ ok: false, error: 'missing created' })
+  })
+
+  it('output satisfies the internal isHQBlock guard', () => {
+    const r = adaptExternalBlock({ id: 'a', kind: 'k', ts: T, title: 'x', status: 'open', refs: [{ kind: 'doc', value: 'd' }] })
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(isHQBlock(r.block)).toBe(true)
+  })
+})
+
+describe('parseExternalJsonl', () => {
+  it('adapts good lines, collects bad ones with 1-based numbers, skips blanks', () => {
+    const good = JSON.stringify({ id: 'a', kind: 'decision', ts: T, title: 'ok' })
+    const text = `\n${good}\n{not json\n{"kind":"x","ts":"${T}"}\n`
+    const { blocks, errors } = parseExternalJsonl(text)
+    expect(blocks.map((b) => b.id)).toEqual(['a'])
+    expect(errors.map((e) => e.line)).toEqual([3, 4])
+    expect(errors[0].reason).toContain('invalid JSON')
+    expect(errors[1].reason).toBe('missing id')
   })
 })
 

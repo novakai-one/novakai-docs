@@ -156,3 +156,101 @@ describe('HQ middleware routes (integration, temp appDir)', () => {
     expect(status).toBe(400)
   })
 })
+
+describe('HQ read-only external stores (provenance + guards)', () => {
+  let etmp = ''
+  let storesDir = ''
+  let eserver: http.Server | null = null
+  let ebase = ''
+
+  const start = async (deps: Parameters<typeof createMdApiMiddleware>[0]) => {
+    const handler = createMdApiMiddleware(deps)
+    eserver = http.createServer((rq, rs) => handler(rq, rs, () => { rs.statusCode = 404; rs.end() }))
+    await new Promise<void>((resolve) => eserver!.listen(0, '127.0.0.1', resolve))
+    ebase = `http://127.0.0.1:${(eserver.address() as AddressInfo).port}`
+  }
+  const ereq = async (method: string, url: string, body?: unknown) => {
+    const res = await fetch(`${ebase}${url}`, {
+      method,
+      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+    return { status: res.status, json: (await res.json().catch(() => null)) as unknown }
+  }
+
+  beforeEach(() => {
+    etmp = fs.mkdtempSync(path.join(os.tmpdir(), 'novakai-docs-ext-'))
+    storesDir = path.join(etmp, 'stores')
+    fs.mkdirSync(storesDir)
+    delete process.env.NVK_STORES_DIR
+  })
+  afterEach(async () => {
+    if (eserver) await new Promise<void>((resolve) => eserver!.close(() => resolve()))
+    eserver = null
+    delete process.env.NVK_STORES_DIR
+    fs.rmSync(etmp, { recursive: true, force: true })
+  })
+
+  it('GET serves adapted external blocks and stamps readOnly/source/dir', async () => {
+    const log = { id: 'log_1', kind: 'log', ts: T, body: 'Observed a thing.' }
+    fs.writeFileSync(path.join(storesDir, 'captains-log.jsonl'), JSON.stringify(log) + '\n')
+    await start({ appDir: etmp, roots: [], storesDir })
+    const { status, json } = await ereq('GET', '/api/hq?store=captains-log')
+    expect(status).toBe(200)
+    const data = json as HQStoreData
+    expect(data.readOnly).toBe(true)
+    expect(data.source).toBe('external')
+    expect(data.dir).toBe(storesDir)
+    expect(data.blocks[0].title).toBe('Observed a thing.')
+    expect(data.blocks[0].created).toBe(T)
+  })
+
+  it('all four mutators return 405 and leave the file bytes unchanged', async () => {
+    const file = path.join(storesDir, 'tasks.jsonl')
+    const original = JSON.stringify({ id: 't1', kind: 'task', status: 'todo', title: 'keep me', created: T, updated: T }) + '\n'
+    fs.writeFileSync(file, original)
+    await start({ appDir: etmp, roots: [], storesDir })
+
+    for (const [method, url, body] of [
+      ['POST', '/api/hq?store=tasks', { title: 'nope' }],
+      ['POST', '/api/hq/reorder?store=tasks', { ids: ['t1'] }],
+      ['PATCH', '/api/hq/t1?store=tasks', { status: 'done' }],
+      ['DELETE', '/api/hq/t1?store=tasks', undefined],
+    ] as const) {
+      const { status, json } = await ereq(method, url, body)
+      expect(status).toBe(405)
+      expect((json as { error: string }).error).toBe('stores are read-only')
+    }
+    expect(fs.readFileSync(file, 'utf-8')).toBe(original)
+  })
+
+  it('a missing source directory surfaces sourceError with the path', async () => {
+    const missing = path.join(etmp, 'gone')
+    await start({ appDir: etmp, roots: [], storesDir: missing })
+    const { status, json } = await ereq('GET', '/api/hq?store=requests')
+    expect(status).toBe(200)
+    const data = json as HQStoreData
+    expect(data.blocks).toEqual([])
+    expect(data.sourceError).toContain(missing)
+  })
+
+  it('resolves deps > env > internal fallback', async () => {
+    // env only → external
+    process.env.NVK_STORES_DIR = storesDir
+    await start({ appDir: etmp, roots: [] })
+    let data = (await ereq('GET', '/api/hq?store=tasks')).json as HQStoreData
+    expect(data.source).toBe('external')
+    expect(data.readOnly).toBe(true)
+    expect(data.dir).toBe(storesDir)
+    await new Promise<void>((resolve) => eserver!.close(() => resolve()))
+    eserver = null
+
+    // neither → internal writable fallback
+    delete process.env.NVK_STORES_DIR
+    fs.mkdirSync(path.join(etmp, 'data'), { recursive: true })
+    await start({ appDir: etmp, roots: [] })
+    data = (await ereq('GET', '/api/hq?store=tasks')).json as HQStoreData
+    expect(data.source).toBe('internal')
+    expect(data.readOnly).toBe(false)
+  })
+})
